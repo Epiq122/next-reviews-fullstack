@@ -1,20 +1,44 @@
 import { readdir, readFile } from "fs/promises";
 import { marked } from "marked";
 import matter from "gray-matter";
+import qs from "qs";
 
 export async function getFeaturedReviews() {
   const reviews = await getReviews();
   return reviews[0];
 }
 
+//    slug: 'hollow-knight',
+//     title: 'Hollow Knight',
+//     date: '2023-11-05',
+//     image: '/images/hollow-knight.jpg',
 export async function getReview(slug) {
-  const text = await readFile(`./content/reviews/${slug}.md`, "utf-8");
-  const {
-    data: { title, date, image },
-    content,
-  } = matter(text);
-  const body = marked(content);
-  return { slug, title, date, image, body };
+  const url =
+    "http://localhost:1337/api/reviews?" +
+    qs.stringify(
+      {
+        fields: ["slug", "title", "subtitle", "publishedAt"],
+        populate: {
+          image: {
+            fields: ["url", "width", "height", "alt"],
+          },
+        },
+        sort: "publishedAt:desc",
+        pagination: {
+          pageSize: 6,
+        },
+      },
+      { encodeValuesOnly: true }
+    );
+  console.log("getReview url", url);
+  const response = await fetch(url);
+  const { data } = await response.json();
+  return data.map(({ attributes }) => ({
+    slug: attributes.slug,
+    title: attributes.title,
+    subtitle: attributes.subtitle,
+    date: attributes.publishedAt,
+  }));
 }
 
 export async function getReviews() {
@@ -24,8 +48,8 @@ export async function getReviews() {
     const review = await getReview(slug);
     reviews.push(review);
   }
-  // Sort reviews by date
-  reviews.sort((a, b) => b.date.localeCompare(a.date));
+  // // Sort reviews by date
+  // reviews.sort((a, b) => b.date.localeCompare(a.date));
 
   return reviews;
 }
